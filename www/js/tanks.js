@@ -77,17 +77,25 @@ EnemyTank.prototype.update = function() {
 
 };
 
-var game = new Phaser.Game(window.innerWidth,window.innerHeight, Phaser.AUTO, 'GameDev', { preload: preload, create: create, update: update, render: render });
+var game = new Phaser.Game(480,800, Phaser.AUTO, 'GameDev', { preload: preload, create: create, update: update, render: render });
 
 function preload () {
 
+	game.load.audio('boden', 'assets/bodenstaendig_2000_in_rock_4bit.ogg');
+	game.load.audio('explode', 'assets/explode.wav');
     game.load.atlas('tank', 'assets/tanks.png', 'assets/tanks.json');
     game.load.atlas('enemy', 'assets/enemy-tanks.png', 'assets/tanks.json');
     game.load.image('logo', 'assets/logo.png');
     game.load.image('bullet', 'assets/bullet.png');
-	game.load.image('arrow-button', 'assets/arrow-button.png');
+	game.load.image('left-button', 'assets/left-button.png');
+	game.load.image('right-button', 'assets/right-button.png');
+	game.load.image('move-button', 'assets/move-button.png');
     game.load.image('earth', 'assets/scorched_earth.png');
     game.load.spritesheet('kaboom', 'assets/explosion.png', 64, 64, 23);
+	
+    // fullscreen setup
+    game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+    game.scale.fullScreenScaleMode = Phaser.ScaleManager.EXACT_FIT;
     
 }
 
@@ -112,19 +120,27 @@ var bullets;
 var fireRate = 100;
 var nextFire = 0;
 
-function create () {
+var leftbutton;
+var rightbutton;
+var movebutton;
 
+left = false;
+right = false;
+move = false;
+
+function create () {
+	if (!game.device.desktop){ game.input.onDown.add(gofull, this); } //go fullscreen on mobile devices
     //  Resize our game world to be a 2000 x 2000 square
     game.world.setBounds(-1000, -1000, 2000, 2000);
+	music = game.add.audio('boden');
 
+    music.play();
     //  Our tiled scrolling background
-    land = game.add.tileSprite(0, 0, window.innerWidth, window.innerHeight, 'earth');
+    land = game.add.tileSprite(0, 0, 480, 800, 'earth');
     land.fixedToCamera = true;
-	
-	//button fire
-	var rightbutton = game.add.button(window.innerWidth/2, window.innerHeight/2, 'arrow-button', this.fire, this, 2, 1, 0);
+
     //  The base of our tank
-    tank = game.add.sprite(window.innerWidth/2, window.innerHeight/2, 'tank', 'tank1');
+    tank = game.add.sprite(0, 0, 'tank', 'tank1');
     tank.anchor.setTo(0.5, 0.5);
     tank.animations.add('move', ['tank1', 'tank2', 'tank3', 'tank4', 'tank5', 'tank6'], 20, true);
 
@@ -138,7 +154,28 @@ function create () {
     //  Finally the turret that we place on-top of the tank body
     turret = game.add.sprite(0, 0, 'tank', 'turret');
     turret.anchor.setTo(0.3, 0.5);
-
+	
+	//button fire
+	leftbutton = game.add.button(130,350, 'left-button', this.fire, this, 0, 1, 0, 1);
+	leftbutton.fixedToCamera = true;  //our buttons should stay on the same place  
+    leftbutton.events.onInputOver.add(function(){left=true;});
+    leftbutton.events.onInputOut.add(function(){left=false;});
+    leftbutton.events.onInputDown.add(function(){left=true;});
+    leftbutton.events.onInputUp.add(function(){left=false;});
+	
+	rightbutton = game.add.button(210,350, 'right-button', this.fire, this, 0, 1, 0, 1);
+	rightbutton.fixedToCamera = true;  //our buttons should stay on the same place  
+    rightbutton.events.onInputOver.add(function(){right=true;});
+    rightbutton.events.onInputOut.add(function(){right=false;});
+    rightbutton.events.onInputDown.add(function(){right=true;});
+    rightbutton.events.onInputUp.add(function(){right=false;});
+	
+	movebutton = game.add.button(0,350, 'move-button', this.fire, this, 0, 1, 0, 1);
+	movebutton.fixedToCamera = true;  //our buttons should stay on the same place  
+    movebutton.events.onInputOver.add(function(){move=true;});
+    movebutton.events.onInputOut.add(function(){move=false;});
+    movebutton.events.onInputDown.add(function(){move=true;});
+    movebutton.events.onInputUp.add(function(){move=false;});
     //  The enemies bullet group
     enemyBullets = game.add.group();
     enemyBullets.enableBody = true;
@@ -188,14 +225,14 @@ function create () {
     tank.bringToTop();
     turret.bringToTop();
 
-    logo = game.add.sprite(0, 200, 'logo');
+    logo = game.add.sprite(100, 200, 'logo');
     logo.fixedToCamera = true;
 
     game.input.onDown.add(removeLogo, this);
 
     game.camera.follow(tank);
-    game.camera.deadzone = new Phaser.Rectangle(150, 150, 500, 300);
-    game.camera.focusOnXY(0, 0);
+    game.camera.deadzone = new Phaser.Rectangle(150, 150, 150, 300);
+    game.camera.focusOn(tank);
 
     cursors = game.input.keyboard.createCursorKeys();
 
@@ -224,21 +261,23 @@ function update () {
             enemies[i].update();
         }
     }
-
-    if (cursors.left.isDown)
+	if (left){ left_now();}
+	if (right){ right_now();}
+    function left_now()
     {
         tank.angle -= 4;
     }
-    else if (cursors.right.isDown)
+    function right_now()
     {
         tank.angle += 4;
     }
 
-    if (cursors.up.isDown)
+    function move_now()
     {
         //  The speed we'll travel at
-        currentSpeed = 300;
+        currentSpeed = 100;
     }
+	if (move){ move_now();}
     else
     {
         if (currentSpeed > 0)
@@ -315,3 +354,5 @@ function render () {
     game.debug.text('Enemies: ' + enemiesAlive + ' / ' + enemiesTotal, 32, 32);
 
 }
+
+function gofull() { game.scale.startFullScreen(false);}
